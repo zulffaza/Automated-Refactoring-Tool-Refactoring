@@ -61,32 +61,28 @@ public class RefactoringImpl implements Refactoring {
     }
 
     private void saveRefactoringFailures(SaveFailsVA saveFailsVA) {
-        Boolean containsKey = saveFailsVA.getRefactoringFailures().containsKey(saveFailsVA.getCodeSmellName());
+        boolean containsKey = saveFailsVA.getRefactoringFailures()
+                .containsKey(saveFailsVA.getCodeSmellName());
 
         if (containsKey) {
-            Map<String, List<MethodModel>> pathFailures = saveFailsVA.getRefactoringFailures().
-                    get(saveFailsVA.getCodeSmellName());
-            savePathFailures(saveFailsVA.getPath(), saveFailsVA.getMethodModel(), pathFailures);
+            saveToPathFailures(saveFailsVA);
         } else {
-            Map<String, List<MethodModel>> pathFailures = new ConcurrentHashMap<>();
-            List<MethodModel> methodFailures = Collections.synchronizedList(new ArrayList<>());
-            methodFailures.add(saveFailsVA.getMethodModel());
-            pathFailures.put(saveFailsVA.getPath(), methodFailures);
-            saveFailsVA.getRefactoringFailures().put(saveFailsVA.getCodeSmellName(), pathFailures);
+            saveNewCodeSmellFailures(saveFailsVA);
         }
     }
 
-    private void savePathFailures(String path, MethodModel methodModel,
-                                  Map<String, List<MethodModel>> pathFailures) {
-        Boolean containsKey = pathFailures.containsKey(path);
+    private void saveToPathFailures(SaveFailsVA saveFailsVA) {
+        Map<String, List<MethodModel>> pathFailures = saveFailsVA.getRefactoringFailures().
+                get(saveFailsVA.getCodeSmellName());
+        List<MethodModel> methodFailures = pathFailures.get(saveFailsVA.getPath());
+        methodFailures.add(saveFailsVA.getMethodModel());
+    }
 
-        if (containsKey) {
-            List<MethodModel> methodFailures = pathFailures.get(path);
-            methodFailures.add(methodModel);
-        } else {
-            List<MethodModel> methodFailures = Collections.synchronizedList(new ArrayList<>());
-            methodFailures.add(methodModel);
-            pathFailures.put(path, methodFailures);
-        }
+    private void saveNewCodeSmellFailures(SaveFailsVA saveFailsVA) {
+        Map<String, List<MethodModel>> pathFailures = new ConcurrentHashMap<>();
+        List<MethodModel> methodFailures = Collections.synchronizedList(new ArrayList<>());
+        methodFailures.add(saveFailsVA.getMethodModel());
+        pathFailures.put(saveFailsVA.getPath(), methodFailures);
+        saveFailsVA.getRefactoringFailures().put(saveFailsVA.getCodeSmellName(), pathFailures);
     }
 }

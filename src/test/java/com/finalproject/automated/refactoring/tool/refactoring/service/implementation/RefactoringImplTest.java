@@ -18,7 +18,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * @author Faza Zulfika P P
@@ -39,6 +39,8 @@ public class RefactoringImplTest {
     private static final String PATH = "filePath";
     private static final String FALSE_PATH = "falseFilePath";
     private static final String METHOD_NAME = "getFigureDrawBounds";
+
+    private static final Integer COPIES = 2;
 
     private MethodModel methodModel;
 
@@ -61,14 +63,17 @@ public class RefactoringImplTest {
                 PATH, Collections.singletonList(methodModel));
 
         assertEquals(Collections.<String, Map<String, List<MethodModel>>>emptyMap(), refactoringResult);
+        verify(extractMethod).refactoring(eq(PATH), eq(methodModel));
+        verifyNoMoreInteractions(extractMethod);
     }
 
     @Test
     public void refactoring_success_methodModelsIsEmpty() {
         Map<String, Map<String, List<MethodModel>>> refactoringResult = refactoring.refactoring(
-                FALSE_PATH, Collections.emptyList());
+                PATH, Collections.emptyList());
 
         assertEquals(Collections.<String, Map<String, List<MethodModel>>>emptyMap(), refactoringResult);
+        verifyNoMoreInteractions(extractMethod);
     }
 
     @Test
@@ -77,6 +82,18 @@ public class RefactoringImplTest {
                 FALSE_PATH, Collections.singletonList(methodModel));
 
         assertEquals(createExpectedFalseResult(), refactoringResult);
+        verify(extractMethod).refactoring(eq(FALSE_PATH), eq(methodModel));
+        verifyNoMoreInteractions(extractMethod);
+    }
+
+    @Test
+    public void refactoring_failed_multiFileFalse() {
+        Map<String, Map<String, List<MethodModel>>> refactoringResult = refactoring.refactoring(
+                FALSE_PATH, Collections.nCopies(COPIES, methodModel));
+
+        assertEquals(createExpectedMultiFalseResult(), refactoringResult);
+        verify(extractMethod, times(COPIES)).refactoring(eq(FALSE_PATH), eq(methodModel));
+        verifyNoMoreInteractions(extractMethod);
     }
 
     @Test(expected = NullPointerException.class)
@@ -91,6 +108,13 @@ public class RefactoringImplTest {
 
     private Map<String, Map<String, List<MethodModel>>> createExpectedFalseResult() {
         List<MethodModel> methodModels = Collections.singletonList(methodModel);
+        Map<String, List<MethodModel>> methodSmells = Collections.singletonMap(FALSE_PATH, methodModels);
+
+        return Collections.singletonMap(CodeSmellName.LONG_METHOD.getName(), methodSmells);
+    }
+
+    private Map<String, Map<String, List<MethodModel>>> createExpectedMultiFalseResult() {
+        List<MethodModel> methodModels = Collections.nCopies(COPIES, methodModel);
         Map<String, List<MethodModel>> methodSmells = Collections.singletonMap(FALSE_PATH, methodModels);
 
         return Collections.singletonMap(CodeSmellName.LONG_METHOD.getName(), methodSmells);
