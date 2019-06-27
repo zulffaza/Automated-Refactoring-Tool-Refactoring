@@ -10,10 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author Faza Zulfika P P
@@ -37,6 +40,22 @@ public class RefactoringImpl implements Refactoring {
         return refactoringFailures;
     }
 
+    @Override
+    public Map<String, Map<String, List<MethodModel>>> refactoring(@NonNull Map<String, List<MethodModel>> methods) {
+        return methods.entrySet()
+                .parallelStream()
+                .map(methodEntry -> refactoring(methodEntry.getKey(), methodEntry.getValue()))
+                .map(Map::entrySet)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, this::mergeResultPath));
+    }
+
+    private Map<String, List<MethodModel>> mergeResultPath(Map<String, List<MethodModel>> result1,
+                                                           Map<String, List<MethodModel>> result2) {
+        return Stream.concat(result1.entrySet().stream(), result2.entrySet().stream())
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
     private void doRefactoring(String path, MethodModel methodModel,
                                Map<String, Map<String, List<MethodModel>>> refactoringFailures) {
         doExtractMethod(path, methodModel, refactoringFailures);
@@ -56,6 +75,9 @@ public class RefactoringImpl implements Refactoring {
                         .build();
 
                 saveRefactoringFailures(saveFailsVA);
+            } else {
+                methodModel.getCodeSmells()
+                        .remove(CodeSmellName.LONG_METHOD);
             }
         }
     }
@@ -74,15 +96,26 @@ public class RefactoringImpl implements Refactoring {
     private void saveToPathFailures(SaveFailsVA saveFailsVA) {
         Map<String, List<MethodModel>> pathFailures = saveFailsVA.getRefactoringFailures().
                 get(saveFailsVA.getCodeSmellName());
-        List<MethodModel> methodFailures = pathFailures.get(saveFailsVA.getPath());
+        boolean containsKey = pathFailures.containsKey(saveFailsVA.getPath());
+
+        if (containsKey) {
+            List<MethodModel> methodFailures = pathFailures.get(saveFailsVA.getPath());
+            methodFailures.add(saveFailsVA.getMethodModel());
+        } else {
+            saveNewMethodFailure(pathFailures, saveFailsVA);
+        }
+    }
+
+    private void saveNewMethodFailure(Map<String, List<MethodModel>> pathFailures, SaveFailsVA saveFailsVA) {
+        List<MethodModel> methodFailures = Collections.synchronizedList(new ArrayList<>());
         methodFailures.add(saveFailsVA.getMethodModel());
+        pathFailures.put(saveFailsVA.getPath(), methodFailures);
     }
 
     private void saveNewCodeSmellFailures(SaveFailsVA saveFailsVA) {
         Map<String, List<MethodModel>> pathFailures = new ConcurrentHashMap<>();
-        List<MethodModel> methodFailures = Collections.synchronizedList(new ArrayList<>());
-        methodFailures.add(saveFailsVA.getMethodModel());
-        pathFailures.put(saveFailsVA.getPath(), methodFailures);
-        saveFailsVA.getRefactoringFailures().put(saveFailsVA.getCodeSmellName(), pathFailures);
+        saveNewMethodFailure(pathFailures, saveFailsVA);
+        saveFailsVA.getRefactoringFailures()
+                .put(saveFailsVA.getCodeSmellName(), pathFailures);
     }
 }

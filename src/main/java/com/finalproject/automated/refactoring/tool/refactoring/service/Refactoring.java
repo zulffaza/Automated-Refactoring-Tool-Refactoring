@@ -16,4 +16,6 @@ public interface Refactoring {
 
     Map<String, Map<String, List<MethodModel>>> refactoring(@NonNull String path,
                                                             @NonNull List<MethodModel> methodModels);
+
+    Map<String, Map<String, List<MethodModel>>> refactoring(@NonNull Map<String, List<MethodModel>> methods);
 }
